@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Laboratório JIMP Realce</title>
+    <script src="https://cdn.rawgit.com/oliver-moran/jimp/v0.2.27/browser/lib/jimp.min.js"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+	var imagem_atual = null;
+        function mostrarImagem(element) {
+        var arquivo = element.files[0];
+        var reader = new FileReader();
+        reader.readAsArrayBuffer(arquivo);
+        reader.addEventListener('load', function(){
+          Jimp.read(this.result)
+            .then(function(imagem){
+              imagem = imagem.resize(470,350);
+              imagem_atual = imagem;
+              exibirImagem(imagem);
+            })
+            .catch(function(erro){
+              console.log('Não foi possível processar os dados da imagem.');
+              console.log(erro);
+            });
+        });
+      }
+      function exibirImagem(imagem) {
+        imagem.getBase64(Jimp.MIME_JPEG, function(err, src){
+            var img = document.getElementById('display');
+            img.setAttribute('src', src);
+          });
+      }
+
+      function Filtragem(elemento){
+		var t = parseInt(elemento.value);
+		var w = imagem_atual.bitmap.width;
+		var h = imagem_atual.bitmap.height;
+		var imagem = imagem_atual.clone();
+                var aux = imagem;
+		var maiorR = -600;
+		var maiorG = -600;
+		var maiorB = -600;
+		var menorR = 600;
+		var menorG = 600;
+		var menorB = 600;
+		
+		for(var i = 0; i < w; i++) {
+			for(var j = 0; j < h; j++) {
+				var cor = imagem.getPixelColor(i,j);
+				var rgba = Jimp.intToRGBA(cor);
+                                
+                                if(rgba.r > maiorR){
+                                    maiorR = rgba.r;
+                                }
+				else if(rgba.g> maiorG){
+                                    maiorG = rgba.g;
+                                }
+                                else if(rgba.b > maiorB){
+                                    maiorB = rgba.b;
+                                }
+                                else if(rgba.r < menorR){
+                                    menorR = rgba.r;
+                                }
+				else if(rgba.g < menorG){
+                                    menorG = rgba.g;
+                                }
+                                else if(rgba.b < menorB){
+                                    menorB = rgba.b;
+                                }                               
+			}
+		}
+                //var filtro = [[1,1,1],[1,1,1],[1,1,1]]; // SUAVIZAR
+                var filtro = [[1,1,1],[1,2,1],[1,1,1]]; // SUAVIZAR
+                //var filtro = [[1,2,1],[2,4,2],[1,2,1]]; // SUAVIZAR
+                var div = 10;
+		for(var i = 1; i < w-1; i++) {
+			for(var j = 1; j < h-1; j++) {
+				var somaVermelho = 0;
+				var somaVerde = 0;
+				var somaAzul = 0;
+				var g = 0;
+				var t = 0;
+				for(var x = i-1; x < i+2; x++) {
+					for(var y = j-1; y < j+2; y++) {
+						var cor = imagem.getPixelColor(x,y);
+						var rgba = Jimp.intToRGBA(cor);
+						somaVermelho = (filtro[g][t]*rgba.r) + somaVermelho;
+						somaVerde = (filtro[g][t]*rgba.g) + somaVerde;
+						somaAzul = (filtro[g][t]*rgba.b) + somaAzul;
+						t++;
+					}
+					g++;
+					t = 0;
+				}
+                                
+				somaVermelho = Math.floor(somaVermelho/div);
+				somaVerde = Math.floor(somaVerde/div);
+				somaAzul = Math.floor(somaAzul/div);
+				
+				somaVermelho = escalonamento(somaVermelho, maiorR, menorR);
+				somaVerde = escalonamento(somaVerde, maiorG, menorG);
+				somaAzul = escalonamento(somaAzul, maiorB, menorB);
+				
+				var hex = Jimp.rgbaToInt(somaVermelho, somaVerde, somaAzul, rgba.a);
+				aux.setPixelColor(hex, i, j);
+			}
+		}
+		exibirImagemFinal(aux);
+	}
+        
+        function exibirImagemFinal(imagem) {
+        imagem.getBase64(Jimp.MIME_JPEG, function(err, src){
+            var img = document.getElementById('display');
+            img.setAttribute('src', src);
+        });
+        }
+        
+        function escalonamento(pixel, Tmax, Tmin){
+		var x = Math.floor((255/(Tmax-Tmin))*(pixel-Tmin));
+                if(x > 255){
+                    x = 255;
+                }
+                else if (x < 0){
+                    x = 0;
+                }
+		return x;
+	}
+      </script>
+</head>
+<body>
+<p>Escolha um arquivo de imagem</p>
+    <input type="file" onchange="mostrarImagem(this)">
+    <p>Escolha um numero para iniciar a suavização:</p>
+    <input type="number" id="valor-threshold" value="5" onchange="Filtragem(this)">
+    <br>
+    <img id="display">
+</body>
+</html>
